@@ -150,6 +150,9 @@ async def process_card(site, cc):
         domain = f"https://{site}"
         pk = "pk_live_51HXJ75BNphwjqAcqNxLniKwT9tTzm87qpBKv6OpGGj40ijQY6fxDNVTVPDtHvyaRkpI1q7DON9p3kukPjh7IjCPf00AGX8DWsR"
         
+        # URL decode the CC parameter if needed
+        cc = cc.replace('%7C', '|')
+        
         result = await ppc(cc, domain, pk)
         return jsonify({
             "status": "success",
@@ -159,10 +162,11 @@ async def process_card(site, cc):
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
-        }), 400
+            "message": str(e),
+            "error_type": type(e).__name__
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print(f"Server running on port {port}")
+    print(f"* Running on port {port}")
     app.run(host='0.0.0.0', port=port)
