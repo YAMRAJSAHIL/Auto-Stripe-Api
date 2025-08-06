@@ -1,11 +1,9 @@
 from flask import Flask, request, jsonify
 import aiohttp
 import asyncio
+import os
 
 app = Flask(__name__)
-
-DOMAIN = None
-PK = None
 
 def parseX(data, start, end):
     try:
@@ -149,7 +147,6 @@ async def ppc(cards, domain, pk):
 @app.route('/gateway=autostripe/key=AloneOp/site=<site>/cc=<cc>')
 async def process_card(site, cc):
     try:
-        # Set the domain and Stripe public key based on the site parameter
         domain = f"https://{site}"
         pk = "pk_live_51HXJ75BNphwjqAcqNxLniKwT9tTzm87qpBKv6OpGGj40ijQY6fxDNVTVPDtHvyaRkpI1q7DON9p3kukPjh7IjCPf00AGX8DWsR"
         
@@ -166,4 +163,6 @@ async def process_card(site, cc):
         }), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Server running on port {port}")
+    app.run(host='0.0.0.0', port=port)
