@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import aiohttp
 import asyncio
 import os
+import json
 
 app = Flask(__name__)
 
@@ -112,6 +113,17 @@ async def ppc(cards, domain, pk):
             data=data2,
         )
         await asyncio.sleep(1)
+        stripe_response = json.loads(req2)
+        
+        if "error" in stripe_response:
+            error_message = stripe_response["error"]["message"].lower()
+            if "your request was in live mode, but used a known test card" in error_message:
+                return "Your card was declined. Your request was in live mode, but used a known test card."          
+            else:
+                return f"{stripe_response['error']['message']}"
+        
+        if "id" not in stripe_response:
+            return f"{req2[:100]}"
         pmid = parseX(req2, '"id": "', '"')
 
         headers3 = {
@@ -145,28 +157,56 @@ async def ppc(cards, domain, pk):
         return req4
 
 @app.route('/gateway=autostripe/key=AloneOp/site=<site>/cc=<cc>')
-async def process_card(site, cc):
-    try:
-        domain = f"https://{site}"
+def process_card(site, cc):
+    try:        
+        if not site.startswith(('http://', 'https://')):
+            domain = f"https://{site}"
+        else:
+            domain = site
         pk = "pk_live_51HXJ75BNphwjqAcqNxLniKwT9tTzm87qpBKv6OpGGj40ijQY6fxDNVTVPDtHvyaRkpI1q7DON9p3kukPjh7IjCPf00AGX8DWsR"
         
-        # URL decode the CC parameter if needed
         cc = cc.replace('%7C', '|')
         
-        result = await ppc(cc, domain, pk)
-        return jsonify({
-            "status": "success",
-            "card": cc,
-            "result": result
+        result = asyncio.run(ppc(cc, domain, pk))
+                
+        message = result.lower()
+        
+        if "success" in message and "succeeded" in message:
+            status = "𝗔𝗽𝗽𝗿𝗼𝘃𝗲𝗱 ✅"
+            response_msg = "Payment method added successfully."
+        elif "authentication_required" in message or "requires_action" in message:
+            status = "𝗗𝗘𝗖𝗟𝗜𝗡𝗘𝗗 ❌"
+            response_msg = "3DS Action"
+        elif "insufficient_funds" in message:
+            status = "𝗔𝗽𝗽𝗿𝗼𝘃𝗲𝗱 ❎"
+            response_msg = "Insufficient Funds"
+        elif "incorrect_cvc" in message or "security code is incorrect" in message:
+            status = "𝗗𝗲𝗰𝗹𝗶𝗻𝗲𝗱 ❌"
+            response_msg = "Your card's security code is incorrect."
+        elif "incorrect number" in message or "invalid number" in message or "card number is incorrect" in message:
+            status = "𝗗𝗘𝗖𝗟𝗜𝗡𝗘𝗗 ❌"
+            response_msg = "Your card number is incorrect."
+        elif "card_declined" in message or "declined" in message:
+            status = "𝗗𝗘𝗖𝗟𝗜𝗡𝗘𝗗 ❌"
+            response_msg = "Your card was declined"
+        elif "expired" in message:
+            status = "𝗗𝗘𝗖𝗟𝗜𝗡𝗘𝗗 ❌"
+            response_msg = "Card expired"  
+        else:
+            status = "𝗗𝗘𝗖𝗟𝗜𝗡𝗘𝗗 ❌"
+            response_msg = result[:100] if len(result) > 100 else result
+        
+        return jsonify({            
+            "message": response_msg,
+            "status": status,
+            "card": cc
         })
     except Exception as e:
         return jsonify({
-            "status": "error",
             "message": str(e),
+            "status": "error",          
             "error_type": type(e).__name__
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"* Running on port {port}")
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000, debug=True)
