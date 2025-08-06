@@ -197,14 +197,14 @@ def process_card(site, cc):
             response_msg = result[:100] if len(result) > 100 else result
         
         return jsonify({            
-            "message": response_msg,
-            "status": status,
+            "message": response_msg
+            "status": status
             "card": cc
         })
     except Exception as e:
         return jsonify({
-            "message": str(e),
-            "status": "error",          
+            "message": str(e)
+            "status": "error"          
             "error_type": type(e).__name__
         }), 500
 
